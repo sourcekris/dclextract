@@ -18,8 +18,24 @@ const (
 
 // Signatures holds the magic byte signatures for each file type
 var Signatures = map[FileType][]byte{
-	TypeUNCMZ: []byte{'C', 'M', 'P', 'Z'},
+	TypeUNCMZ: []byte{'C', 'l', 'a', 'y'},
 	TypeUNNSK: []byte{'N', 'S', 'K', 0x1A},
-	TypeUNTSC: []byte{'T', 'S', 'C', 0x1A},
-	TypeUNZAR: []byte{0x1F, 0x9E},
+	TypeUNTSC: []byte{0x65, 0x5D, 0x13, 0x8C, 0x08, 0x01},
+	TypeUNZAR: []byte{'P', 'T', '&'},
+}
+
+// String returns the string representation of the FileType
+func (ft FileType) String() string {
+	switch ft {
+	case TypeUNCMZ:
+		return "UNCMZ"
+	case TypeUNNSK:
+		return "UNNSK"
+	case TypeUNTSC:
+		return "UNTSC"
+	case TypeUNZAR:
+		return "UNZAR"
+	default:
+		return "Unknown"
+	}
 }

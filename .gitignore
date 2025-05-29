@@ -3,3 +3,7 @@ unnsk/
 untsc/
 unzar/
 *.copilot
+*.CMZ
+*.NSK
+*.TSC
+*.ZAR
