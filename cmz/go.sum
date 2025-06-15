@@ -1,0 +1,4 @@
+github.com/JoshVarga/blast v0.0.0-20210808061142-eadad17358e8 h1:9bbQDlx6h7MyNk3Ljr5wNqFQ5gEhX7pE4j7EHL86/2Q=
+github.com/JoshVarga/blast v0.0.0-20210808061142-eadad17358e8/go.mod h1:rwSKMTLI/8tbw6YDRqtd3Hc0OI3eP/tSTVKshyd8dO8=
+github.com/sourcekris/dclextract/common v0.0.0-20250615075727-4562d73d3a79 h1:K+m2Ni7QqvoiyeBQSFVDV18UL1cgw3G+tRqrEoHY2Ew=
+github.com/sourcekris/dclextract/common v0.0.0-20250615075727-4562d73d3a79/go.mod h1:2QKyVVbJ3n7icq8l189MuxA9pJNBvMaiNHUku8BWRa0=
