@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,108 +22,139 @@ type ExtractedFileData struct {
 
 func determineFileType(data []byte) FileType {
 	switch {
-	case bytes.HasPrefix(data, Signatures[TypeUNCMZ]):
-		return TypeUNCMZ
-	case bytes.HasPrefix(data, Signatures[TypeUNNSK]):
-		return TypeUNNSK
-	case bytes.HasPrefix(data, Signatures[TypeUNTSC]):
-		return TypeUNTSC
-	case bytes.HasPrefix(data, Signatures[TypeUNZAR]):
-		return TypeUNZAR
+	case bytes.HasPrefix(data, Signatures[TypeCMZ]):
+		return TypeCMZ
+	case bytes.HasPrefix(data, Signatures[TypeNSK]):
+		return TypeNSK
+	case bytes.HasPrefix(data, Signatures[TypeTSC]):
+		return TypeTSC
+	case bytes.HasPrefix(data, Signatures[TypeZAR]):
+		return TypeZAR
 	default:
 		return TypeUnknown
 	}
 }
 
-func extractUNCMZ(rs io.ReadSeeker) ([]ExtractedFileData, error) {
+func readFileMagic(rs io.Reader, expectedMagic []byte) (bytesRead int, err error) {
+	magicBuffer := make([]byte, len(expectedMagic))
+	n, err := io.ReadFull(rs, magicBuffer)
+	if err != nil {
+		return n, err // Could be io.EOF, io.ErrUnexpectedEOF, or other I/O error
+	}
+	if !bytes.Equal(magicBuffer, expectedMagic) {
+		return n, fmt.Errorf("magic bytes mismatch: expected %x, got %x", expectedMagic, magicBuffer)
+	}
+	return n, nil
+}
+
+func readCMZMemberMetadata(rs io.Reader) (compSize, decompSize uint32, fnSize int, err error) {
+	metadata := make([]byte, 16)
+	if _, err = io.ReadFull(rs, metadata); err != nil {
+		return 0, 0, 0, fmt.Errorf("reading metadata: %w", err)
+	}
+
+	compSize = binary.LittleEndian.Uint32(metadata[0:4])
+	decompSize = binary.LittleEndian.Uint32(metadata[4:8])
+	fnSize = int(metadata[12])
+
+	if fnSize < 0 {
+		return 0, 0, 0, fmt.Errorf("invalid filename size %d", fnSize)
+	}
+	return compSize, decompSize, fnSize, nil
+}
+
+func readFilename(rs io.Reader, fnSize int) (string, error) {
+	if fnSize == 0 {
+		return "", nil
+	}
+	filenameBytes := make([]byte, fnSize)
+	if _, err := io.ReadFull(rs, filenameBytes); err != nil {
+		return "", fmt.Errorf("reading filename: %w", err)
+	}
+	return string(filenameBytes), nil
+}
+
+func readAndDecompressBlastData(rs io.Reader, compSize, decompSize uint32) ([]byte, error) {
+	compressedData := make([]byte, compSize)
+	if _, err := io.ReadFull(rs, compressedData); err != nil {
+		return nil, fmt.Errorf("reading compressed data: %w", err)
+	}
+
+	blastReader, err := blast.NewReader(bytes.NewReader(compressedData))
+	if err != nil {
+		return nil, fmt.Errorf("creating blast reader: %w", err)
+	}
+	defer blastReader.Close() // Ensure reader is closed
+
+	decompressedData := make([]byte, decompSize)
+	if n, err := io.ReadFull(blastReader, decompressedData); err != nil {
+		return nil, fmt.Errorf("decompressing data (read %d of %d bytes): %w", n, decompSize, err)
+	}
+	return decompressedData, nil
+}
+
+// readNSKMemberMetadata reads the 14-byte metadata block for an NSK member.
+// Metadata structure: compSize (4), unknown (5), decompSize (4), fnSize (1)
+func readNSKMemberMetadata(rs io.Reader) (compSize, decompSize uint32, fnSize int, err error) {
+	metadata := make([]byte, 14) // As per unnsk.go structure
+	if _, errRead := io.ReadFull(rs, metadata); errRead != nil {
+		return 0, 0, 0, fmt.Errorf("reading nsk metadata block: %w", errRead)
+	}
+
+	compSize = binary.LittleEndian.Uint32(metadata[0:4])
+	// metadata[4:9] are 5 unknown bytes (indices 4, 5, 6, 7, 8)
+	decompSize = binary.LittleEndian.Uint32(metadata[9:13]) // metadata[9], [10], [11], [12]
+	fnSize = int(metadata[13])
+
+	if compSize < 0 || decompSize < 0 || fnSize < 0 { // Basic sanity check
+		return 0, 0, 0, fmt.Errorf("invalid nsk metadata values: compSize=%d, decompSize=%d, fnSize=%d", compSize, decompSize, fnSize)
+	}
+	return compSize, decompSize, fnSize, nil
+}
+
+func extractCMZ(rs io.ReadSeeker) ([]ExtractedFileData, error) {
 	var allFiles []ExtractedFileData
 	processedAnyFile := false
 
 	for {
-		currentPos, err := rs.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return allFiles, fmt.Errorf("UNCMZ: failed to get current position: %w", err)
-		}
-
 		// 1. Read Magic (4 bytes)
-		magic := make([]byte, len(Signatures[TypeUNCMZ]))
-		bytesRead, err := io.ReadFull(rs, magic)
-
+		br, err := readFileMagic(rs, Signatures[TypeCMZ])
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				// If we read 0 bytes and have processed files, it's a clean end.
-				if bytesRead == 0 && processedAnyFile && err == io.EOF {
+				if br == 0 && processedAnyFile && err == io.EOF {
 					return allFiles, nil
 				}
 				// Otherwise, it's an unexpected end or an empty file on first try.
-				if processedAnyFile { // Error trying to read the *next* member
-					return allFiles, fmt.Errorf("UNCMZ: unexpected end of archive while expecting next member header: %w", err)
+				if processedAnyFile {
+					return allFiles, fmt.Errorf("CMZ: unexpected end of archive while expecting next member header: %w", err)
 				}
-				// Error on the very first attempt to read a member
-				return allFiles, fmt.Errorf("UNCMZ: failed to read member header: %w", err)
+				// Error on the very first attempt to read a member (or magic mismatch)
+				return allFiles, fmt.Errorf("CMZ: failed to read member header: %w", err)
 			}
 			// Other I/O error
-			return allFiles, fmt.Errorf("UNCMZ: error reading member magic: %w", err)
+			return allFiles, fmt.Errorf("CMZ: error reading member magic: %w", err)
 		}
-
-		if !bytes.Equal(magic, Signatures[TypeUNCMZ]) {
-			if !processedAnyFile {
-				// This should ideally be caught by determineFileType if the file starts with non-CMZ
-				return nil, errors.New("invalid UNCMZ magic at start of stream")
-			}
-			// Not a CMZ signature, means previous CMZ member was the last. Seek back.
-			if _, seekErr := rs.Seek(currentPos, io.SeekStart); seekErr != nil {
-				// Log or handle: failed to rewind, but we have extracted files.
-				fmt.Fprintf(os.Stderr, "Warning: UNCMZ: failed to seek back after non-CMZ data: %v\n", seekErr)
-			}
-			return allFiles, nil // End of CMZ members
-		}
-
+		// At this point, br should be len(expectedMagic) and err is nil
 		processedAnyFile = true
 
-		// 2. Read Metadata (16 bytes)
-		metadata := make([]byte, 16)
-		if _, err := io.ReadFull(rs, metadata); err != nil {
-			return allFiles, fmt.Errorf("UNCMZ: reading metadata for member: %w", err)
-		}
-
-		compSize := binary.LittleEndian.Uint32(metadata[0:4])
-		decompSize := binary.LittleEndian.Uint32(metadata[4:8])
-		fnSize := int(metadata[12])
-
-		if fnSize < 0 {
-			return allFiles, fmt.Errorf("UNCMZ: invalid filename size %d for member", fnSize)
+		// 2. Read Metadata
+		compSize, decompSize, fnSize, err := readCMZMemberMetadata(rs)
+		if err != nil {
+			return allFiles, fmt.Errorf("CMZ: reading member metadata: %w", err)
 		}
 
 		// 3. Read Filename
-		var originalFilename string
-		if fnSize > 0 {
-			filenameBytes := make([]byte, fnSize)
-			if _, err := io.ReadFull(rs, filenameBytes); err != nil {
-				return allFiles, fmt.Errorf("UNCMZ: reading filename for member: %w", err)
-			}
-			originalFilename = string(filenameBytes)
-		}
-
-		// 4. Read Compressed Data
-		compressedData := make([]byte, compSize)
-		if _, err := io.ReadFull(rs, compressedData); err != nil {
-			return allFiles, fmt.Errorf("UNCMZ: reading compressed data for member '%s': %w", originalFilename, err)
-		}
-
-		// 5. Decompress
-		blastReader, err := blast.NewReader(bytes.NewReader(compressedData))
+		originalFilename, err := readFilename(rs, fnSize)
 		if err != nil {
-			return allFiles, fmt.Errorf("UNCMZ: creating blast reader for member '%s': %w", originalFilename, err)
+			return allFiles, fmt.Errorf("CMZ: reading member filename: %w", err)
 		}
 
-		decompressedData := make([]byte, decompSize)
-		if n, err := io.ReadFull(blastReader, decompressedData); err != nil {
-			return allFiles, fmt.Errorf("UNCMZ: decompressing data for member '%s' (read %d of %d bytes): %w", originalFilename, n, decompSize, err)
-		}
-		if err := blastReader.Close(); err != nil {
-			// Log this, but don't necessarily fail the whole extraction for it
-			fmt.Fprintf(os.Stderr, "Warning: UNCMZ: error closing blast reader for member '%s': %v\n", originalFilename, err)
+		// 4. Read Compressed Data & Decompress
+		limitedDataReader := io.LimitReader(rs, int64(compSize))
+		decompressedData, err := readAndDecompressBlastData(limitedDataReader, compSize, decompSize)
+		if err != nil {
+			return allFiles, fmt.Errorf("CMZ: processing data for member '%s': %w", originalFilename, err)
 		}
 
 		allFiles = append(allFiles, ExtractedFileData{
@@ -136,111 +166,65 @@ func extractUNCMZ(rs io.ReadSeeker) ([]ExtractedFileData, error) {
 	}
 }
 
-func extractUNNSK(r io.Reader) (data []byte, filename string, compSize uint32, decompSize uint32, err error) {
-	var header struct {
-		Magic      [4]byte
-		DecompSize uint32
-		CompSize   uint32
-	}
-	if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-		return nil, "", 0, 0, err
-	}
+func extractNSK(rs io.ReadSeeker) ([]ExtractedFileData, error) {
+	var allFiles []ExtractedFileData
+	processedAnyFile := false
 
-	if !bytes.Equal(header.Magic[:], Signatures[TypeUNNSK]) {
-		return nil, "", 0, 0, errors.New("invalid UNNSK magic")
-	}
-
-	compressedData := make([]byte, header.CompSize)
-	if _, err := io.ReadFull(r, compressedData); err != nil {
-		return nil, "", 0, 0, err
-	}
-
-	blastReader, err := blast.NewReader(bytes.NewReader(compressedData))
-	if err != nil {
-		return nil, "", 0, 0, fmt.Errorf("creating UNNSK blast reader: %w", err)
-	}
-
-	decompressedData := make([]byte, header.DecompSize)
-	if n, err := io.ReadFull(blastReader, decompressedData); err != nil {
-		if err == io.ErrUnexpectedEOF {
-			return nil, "", 0, 0, fmt.Errorf("decompressing UNNSK data (read %d of %d bytes): unexpected EOF: %w", n, header.DecompSize, err)
+	for {
+		// 1. Read Member Magic (3 bytes "NSK")
+		br, err := readFileMagic(rs, Signatures[TypeNSK])
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				// If we read 0 bytes and have processed files, it's a clean end.
+				if br == 0 && processedAnyFile && err == io.EOF {
+					return allFiles, nil
+				}
+				// Otherwise, it's an unexpected end or an empty file on first try.
+				if processedAnyFile {
+					return allFiles, fmt.Errorf("NSK: unexpected end of archive while expecting next member header: %w", err)
+				}
+				// Error on the very first attempt to read a member (or magic mismatch)
+				return allFiles, fmt.Errorf("NSK: failed to read member header: %w", err)
+			}
+			// Other I/O error
+			return allFiles, fmt.Errorf("NSK: error reading member magic: %w", err)
 		}
-		return nil, "", 0, 0, fmt.Errorf("decompressing UNNSK data (read %d of %d bytes): %w", n, header.DecompSize, err)
+
+		processedAnyFile = true
+
+		// 2. Read NSK Member Metadata
+		compSize, decompSize, fnSize, err := readNSKMemberMetadata(rs)
+		if err != nil {
+			return allFiles, fmt.Errorf("NSK: reading member metadata: %w", err)
+		}
+
+		// 3. Read Filename
+		originalFilename, err := readFilename(rs, fnSize)
+		if err != nil {
+			return allFiles, fmt.Errorf("NSK: reading member filename for member: %w", err)
+		}
+
+		// 4. Read Compressed Data & Decompress (using Blast)
+		limitedDataReader := io.LimitReader(rs, int64(compSize))
+		decompressedData, err := readAndDecompressBlastData(limitedDataReader, compSize, decompSize)
+		if err != nil {
+			return allFiles, fmt.Errorf("NSK: processing data for member '%s': %w", originalFilename, err)
+		}
+
+		allFiles = append(allFiles, ExtractedFileData{
+			Filename:         originalFilename,
+			Data:             decompressedData,
+			CompressedSize:   compSize,
+			DecompressedSize: decompSize,
+		})
 	}
-	return decompressedData, "", header.CompSize, header.DecompSize, nil
+}
+func extractTSC(r io.Reader) (data []byte, filename string, compSize uint32, decompSize uint32, err error) {
+	return nil, "", 0, 0, fmt.Errorf("TSC extraction not implemented yet")
 }
 
-func extractUNTSC(r io.Reader) (data []byte, filename string, compSize uint32, decompSize uint32, err error) {
-	var header struct {
-		Magic      [4]byte
-		DecompSize uint32
-		CompSize   uint32
-	}
-	if err := binary.Read(r, binary.LittleEndian, &header); err != nil {
-		return nil, "", 0, 0, err
-	}
-
-	if !bytes.Equal(header.Magic[:], Signatures[TypeUNTSC]) {
-		return nil, "", 0, 0, errors.New("invalid UNTSC magic")
-	}
-
-	compressedData := make([]byte, header.CompSize)
-	if _, err := io.ReadFull(r, compressedData); err != nil {
-		return nil, "", 0, 0, err
-	}
-
-	blastReader, err := blast.NewReader(bytes.NewReader(compressedData))
-	if err != nil {
-		return nil, "", 0, 0, fmt.Errorf("creating UNTSC blast reader: %w", err)
-	}
-
-	decompressedData := make([]byte, header.DecompSize)
-	if n, err := io.ReadFull(blastReader, decompressedData); err != nil {
-		if err == io.ErrUnexpectedEOF {
-			return nil, "", 0, 0, fmt.Errorf("decompressing UNTSC data (read %d of %d bytes): unexpected EOF: %w", n, header.DecompSize, err)
-		}
-		return nil, "", 0, 0, fmt.Errorf("decompressing UNTSC data (read %d of %d bytes): %w", n, header.DecompSize, err)
-	}
-	return decompressedData, "", header.CompSize, header.DecompSize, nil
-}
-
-func extractUNZAR(r io.Reader) (data []byte, filename string, compSize uint32, decompSizeRead uint32, err error) {
-	// Ensure we read the full length of the UNZAR signature
-	sigLen := len(Signatures[TypeUNZAR])
-	if sigLen == 0 { // Should not happen with current signatures.go
-		return nil, "", 0, 0, errors.New("UNZAR signature is undefined or empty")
-	}
-	magic := make([]byte, sigLen)
-	if _, err := io.ReadFull(r, magic); err != nil {
-		return nil, "", 0, 0, fmt.Errorf("reading UNZAR magic: %w", err)
-	}
-	if !bytes.Equal(magic, Signatures[TypeUNZAR]) {
-		return nil, "", 0, 0, errors.New("invalid UNZAR magic")
-	}
-
-	// var decompSize uint32 // Renamed to decompSizeRead to avoid conflict with return var
-	if err = binary.Read(r, binary.LittleEndian, &decompSizeRead); err != nil {
-		return nil, "", 0, 0, fmt.Errorf("reading UNZAR decompressed size: %w", err)
-	}
-
-	compressedData, err := io.ReadAll(r)
-	if err != nil {
-		return nil, "", 0, 0, fmt.Errorf("reading UNZAR compressed data: %w", err)
-	}
-
-	blastReader, err := blast.NewReader(bytes.NewReader(compressedData))
-	if err != nil {
-		return nil, "", 0, 0, fmt.Errorf("creating UNZAR blast reader: %w", err)
-	}
-
-	decompressedData := make([]byte, decompSizeRead)
-	if n, err := io.ReadFull(blastReader, decompressedData); err != nil { // Use decompSizeRead here
-		if err == io.ErrUnexpectedEOF {
-			return nil, "", 0, 0, fmt.Errorf("decompressing UNZAR data (read %d of %d bytes): unexpected EOF: %w", n, decompSizeRead, err)
-		}
-		return nil, "", 0, 0, fmt.Errorf("decompressing UNZAR data (read %d of %d bytes): %w", n, decompSizeRead, err)
-	}
-	return decompressedData, "", uint32(len(compressedData)), decompSizeRead, nil
+func extractZAR(r io.Reader) (data []byte, filename string, compSize uint32, decompSizeRead uint32, err error) {
+	return nil, "", 0, 0, fmt.Errorf("ZAR extraction not implemented yet")
 }
 
 func extract(archivePath string) ([]ExtractedFileData, error) {
@@ -266,41 +250,14 @@ func extract(archivePath string) ([]ExtractedFileData, error) {
 	}
 
 	switch fileType {
-	case TypeUNCMZ:
-		results, err = extractUNCMZ(f) // f is *os.File, which is an io.ReadSeeker
-	case TypeUNNSK:
-		data, fname, cSize, uSize, extractErr := extractUNNSK(f)
-		if extractErr == nil {
-			results = append(results, ExtractedFileData{
-				Filename:         fname,
-				Data:             data,
-				CompressedSize:   cSize,
-				DecompressedSize: uSize,
-			})
-		}
-		err = extractErr
-	case TypeUNTSC:
-		data, fname, cSize, uSize, extractErr := extractUNTSC(f)
-		if extractErr == nil {
-			results = append(results, ExtractedFileData{
-				Filename:         fname,
-				Data:             data,
-				CompressedSize:   cSize,
-				DecompressedSize: uSize,
-			})
-		}
-		err = extractErr
-	case TypeUNZAR:
-		data, fname, cSize, uSize, extractErr := extractUNZAR(f)
-		if extractErr == nil {
-			results = append(results, ExtractedFileData{
-				Filename:         fname,
-				Data:             data,
-				CompressedSize:   cSize,
-				DecompressedSize: uSize,
-			})
-		}
-		err = extractErr
+	case TypeCMZ:
+		results, err = extractCMZ(f) // f is *os.File, which is an io.ReadSeeker
+	case TypeNSK:
+		results, err = extractNSK(f) // f is *os.File, which is an io.ReadSeeker
+	case TypeTSC:
+
+	case TypeZAR:
+
 	default:
 		return nil, fmt.Errorf("unknown file type for %s", archivePath)
 	}
@@ -337,6 +294,7 @@ func main() { //nolint:funlen // main function can be longer
 		os.Exit(0) // Exit if no files, even if there was a non-fatal error reported above
 	}
 
+	// Write the extracted files to disk.
 	defaultFileCounter := 0
 	for i, item := range extractedItems {
 		outputDestFilename := item.Filename
