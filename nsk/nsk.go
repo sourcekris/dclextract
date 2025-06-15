@@ -21,10 +21,6 @@ func readNSKMemberMetadata(rs io.Reader) (compSize, decompSize uint32, fnSize in
 	// metadata[4:9] are 5 unknown bytes (indices 4, 5, 6, 7, 8)
 	decompSize = binary.LittleEndian.Uint32(metadata[9:13]) // metadata[9], [10], [11], [12]
 	fnSize = int(metadata[13])
-
-	if compSize < 0 || decompSize < 0 || fnSize < 0 { // Basic sanity check
-		return 0, 0, 0, fmt.Errorf("invalid nsk metadata values: compSize=%d, decompSize=%d, fnSize=%d", compSize, decompSize, fnSize)
-	}
 	return compSize, decompSize, fnSize, nil
 }
 
