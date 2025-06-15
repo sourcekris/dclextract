@@ -1,4 +1,4 @@
-module github.com/sourcekris/dclextract/v2
+module github.com/sourcekris/dclextract
 
 go 1.21.1
 
