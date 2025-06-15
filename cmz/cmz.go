@@ -32,7 +32,7 @@ func Extract(rs io.ReadSeeker) ([]c.ExtractedFileData, error) {
 
 	for {
 		// 1. Read Magic (4 bytes)
-		br, err := c.ReadFileMagic(rs, Signatures[TypeCMZ])
+		br, err := c.ReadFileMagic(rs, c.Signatures[c.TypeCMZ])
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				// If we read 0 bytes and have processed files, it's a clean end.
@@ -59,19 +59,19 @@ func Extract(rs io.ReadSeeker) ([]c.ExtractedFileData, error) {
 		}
 
 		// 3. Read Filename
-		originalFilename, err := readFilename(rs, fnSize)
+		originalFilename, err := c.ReadFilename(rs, fnSize)
 		if err != nil {
 			return allFiles, fmt.Errorf("CMZ: reading member filename: %w", err)
 		}
 
 		// 4. Read Compressed Data & Decompress
 		limitedDataReader := io.LimitReader(rs, int64(compSize))
-		decompressedData, err := readAndDecompressBlastData(limitedDataReader, compSize, decompSize)
+		decompressedData, err := c.ReadAndDecompressBlastData(limitedDataReader, compSize, decompSize)
 		if err != nil {
 			return allFiles, fmt.Errorf("CMZ: processing data for member '%s': %w", originalFilename, err)
 		}
 
-		allFiles = append(allFiles, ExtractedFileData{
+		allFiles = append(allFiles, c.ExtractedFileData{
 			Filename:         originalFilename,
 			Data:             decompressedData,
 			CompressedSize:   compSize,
