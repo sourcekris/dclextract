@@ -73,7 +73,7 @@ func Extract(rs io.ReadSeeker) ([]c.ExtractedFileData, error) {
 			return allFiles, fmt.Errorf("NSK: processing data for member '%s': %w", originalFilename, err)
 		}
 
-		allFiles = append(allFiles, ExtractedFileData{
+		allFiles = append(allFiles, c.ExtractedFileData{
 			Filename:         originalFilename,
 			Data:             decompressedData,
 			CompressedSize:   compSize,
