@@ -97,8 +97,8 @@ func main() { //nolint:funlen // main function can be longer
 				baseName = "extracted_file"
 			}
 			outputDestFilename = fmt.Sprintf("%s_%d", baseName, defaultFileCounter)
-			if len(extractedItems) == 1 && i == 0 { // Only one file, and it's this one
-				outputDestFilename = baseName // Use simpler name if only one nameless file
+			if len(extractedItems) == 1 && i == 0 { // Only one file, and it's this one.
+				outputDestFilename = baseName // Use simpler name if only one nameless file.
 			}
 			defaultFileCounter++
 			fmt.Printf("No filename found in archive for item %d, using generated name: %s\n", i+1, outputDestFilename)
@@ -106,8 +106,8 @@ func main() { //nolint:funlen // main function can be longer
 
 		writeErr := os.WriteFile(outputDestFilename, item.Data, 0644)
 		if writeErr != nil {
-			fmt.Fprintf(os.Stderr, "Error writing to file %s: %v\n", outputDestFilename, writeErr)
-			// Optionally, set a flag here to exit with error code later if any write fails
+			fmt.Fprintf(os.Stderr, "Error writing data to file %s: %v\n", outputDestFilename, writeErr)
+			// Optionally, set a flag here to exit with error code later if any write fails.
 		} else {
 			fmt.Printf("Successfully extracted %s (compressed: %d bytes, uncompressed: %d bytes) to %s\n", item.Filename, item.CompressedSize, item.DecompressedSize, outputDestFilename)
 		}

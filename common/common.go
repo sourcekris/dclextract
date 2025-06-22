@@ -113,6 +113,11 @@ func ReadFilename(rs io.Reader, fnSize int) (string, error) {
 	if _, err := io.ReadFull(rs, filenameBytes); err != nil {
 		return "", fmt.Errorf("reading filename: %w", err)
 	}
+	// The filename might be null-terminated within the byte slice.
+	// Find the first null byte and truncate the string there.
+	if n := bytes.IndexByte(filenameBytes, 0); n != -1 {
+		return string(filenameBytes[:n]), nil
+	}
 	return string(filenameBytes), nil
 }
 

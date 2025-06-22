@@ -42,10 +42,21 @@ func Extract(rs io.ReadSeeker) ([]c.ExtractedFileData, error) {
 	minorVersion := binary.LittleEndian.Uint16(versionBytes[1:3])
 	versionStr := fmt.Sprintf("%d.%d", majorVersion, minorVersion)
 
+	// 3. Read the wildcard value (1 byte)
+	var wildcardValue [1]byte
+	if _, err := io.ReadFull(rs, wildcardValue[:]); err != nil {
+		return nil, fmt.Errorf("TSC: reading wildcard value: %w", err)
+	}
+
+	// 4. Seek past the reserved bytes (4 bytes)
+	if _, err := rs.Seek(4, io.SeekCurrent); err != nil {
+		return nil, fmt.Errorf("TSC: seeking past reserved bytes: %w", err)
+	}
+
 	var allFiles []c.ExtractedFileData
 
 	for {
-		// 3. Read the header for the next member
+		// 5. Read the header for the next member
 		compSize, fnSize, err := readTSCMemberHeader(rs)
 		if err != nil {
 			if err == io.EOF {
@@ -55,13 +66,13 @@ func Extract(rs io.ReadSeeker) ([]c.ExtractedFileData, error) {
 			return allFiles, fmt.Errorf("TSC: reading member header: %w", err)
 		}
 
-		// 4. Read Filename
-		originalFilename, err := c.ReadFilename(rs, fnSize)
+		// 6. Read Filename
+		originalFilename, err := c.ReadFilename(rs, fnSize+1) // +1 for the null terminator.
 		if err != nil {
 			return allFiles, fmt.Errorf("TSC: reading member filename for member: %w", err)
 		}
 
-		// 5. Read Compressed Data & Decompress (using Blast)
+		// 7. Read Compressed Data & Decompress (using Blast)
 		limitedDataReader := io.LimitReader(rs, int64(compSize))
 		decompressedData, err := c.ReadAndDecompressBlastData(limitedDataReader, compSize, 0) // TSC does not provide decompressed size in the member.
 		if err != nil {
