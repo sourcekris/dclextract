@@ -27,10 +27,10 @@ const (
 
 // Signatures holds the magic byte signatures for each file type
 var Signatures = map[FileType][]byte{
-	TypeCMZ: []byte{'C', 'l', 'a', 'y'},
-	TypeNSK: []byte{'N', 'S', 'K'},
-	TypeTSC: []byte{0x65, 0x5D, 0x13, 0x8C, 0x08},
-	TypeZAR: []byte{'P', 'T', '&'},
+	TypeCMZ: []byte{'C', 'l', 'a', 'y'},           // CMZ files start with "Clay".
+	TypeNSK: []byte{'N', 'S', 'K'},                // NSK files start with "NSK".
+	TypeTSC: []byte{0x65, 0x5D, 0x13, 0x8C, 0x08}, // TSC files start with these bytes.
+	TypeZAR: []byte{'P', 'T', '&'},                // ZAR files end with "PT&" in the footer.
 }
 
 // String returns the string representation of the FileType
@@ -49,6 +49,17 @@ func (ft FileType) String() string {
 	}
 }
 
+// MaxSignatureLength is the length of the longest known file signature.
+var MaxSignatureLength int
+
+func init() {
+	for _, sig := range Signatures {
+		if len(sig) > MaxSignatureLength {
+			MaxSignatureLength = len(sig)
+		}
+	}
+}
+
 // ExtractedFileData holds the data and filename for a single extracted file.
 type ExtractedFileData struct {
 	Filename         string
@@ -58,20 +69,24 @@ type ExtractedFileData struct {
 	Version          string
 }
 
-// DetermineFileType checks the provided data against known signatures.
-func DetermineFileType(data []byte) FileType {
-	switch {
-	case bytes.HasPrefix(data, Signatures[TypeCMZ]):
+// DetermineFileType checks the provided header and footer data against known signatures.
+func DetermineFileType(header, footer []byte) FileType {
+	// Check for header-based signatures first.
+	if bytes.HasPrefix(header, Signatures[TypeCMZ]) {
 		return TypeCMZ
-	case bytes.HasPrefix(data, Signatures[TypeNSK]):
-		return TypeNSK
-	case bytes.HasPrefix(data, Signatures[TypeTSC]):
-		return TypeTSC
-	case bytes.HasPrefix(data, Signatures[TypeZAR]):
-		return TypeZAR
-	default:
-		return TypeUnknown
 	}
+	if bytes.HasPrefix(header, Signatures[TypeNSK]) {
+		return TypeNSK
+	}
+	if bytes.HasPrefix(header, Signatures[TypeTSC]) {
+		return TypeTSC
+	}
+
+	// If no header signature matched, check for footer-based signatures.
+	if bytes.HasSuffix(footer, Signatures[TypeZAR]) {
+		return TypeZAR
+	}
+	return TypeUnknown
 }
 
 // ReadAndDecompressBlastData reads compressed data from the provided io.Reader,

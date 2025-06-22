@@ -10,13 +10,10 @@ import (
 	"github.com/sourcekris/dclextract/cmz"
 	"github.com/sourcekris/dclextract/nsk"
 	"github.com/sourcekris/dclextract/tsc"
+	"github.com/sourcekris/dclextract/zar"
 
 	c "github.com/sourcekris/dclextract/common"
 )
-
-func extractZAR(r io.Reader) (data []byte, filename string, compSize uint32, decompSizeRead uint32, err error) {
-	return nil, "", 0, 0, fmt.Errorf("ZAR extraction not implemented yet")
-}
 
 func extract(archivePath string) ([]c.ExtractedFileData, error) {
 	f, err := os.Open(archivePath)
@@ -27,12 +24,34 @@ func extract(archivePath string) ([]c.ExtractedFileData, error) {
 
 	var results []c.ExtractedFileData
 
-	header := make([]byte, 12)
-	n, err := f.Read(header)
-	if err != nil && err != io.EOF {
-		return nil, err
+	fileSize, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine file size: %w", err)
 	}
-	fileType := c.DetermineFileType(header[:n])
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("could not seek to start: %w", err)
+	}
+
+	// Read header and footer chunks for file type detection.
+	header := make([]byte, c.MaxSignatureLength)
+	n, readErr := f.Read(header)
+	if readErr != nil && readErr != io.EOF {
+		return nil, readErr
+	}
+	header = header[:n] // Slice to actual bytes read
+
+	var footer []byte
+	if fileSize >= int64(c.MaxSignatureLength) {
+		footer = make([]byte, c.MaxSignatureLength)
+		n, readAtErr := f.ReadAt(footer, fileSize-int64(c.MaxSignatureLength))
+		if readAtErr != nil && readAtErr != io.EOF {
+			footer = nil // Non-fatal, clear the footer on error
+		} else {
+			footer = footer[:n]
+		}
+	}
+
+	fileType := c.DetermineFileType(header, footer)
 	fmt.Printf("Detected file type: %s\n", fileType)
 
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
@@ -46,9 +65,8 @@ func extract(archivePath string) ([]c.ExtractedFileData, error) {
 		results, err = nsk.Extract(f)
 	case c.TypeTSC:
 		results, err = tsc.Extract(f)
-
 	case c.TypeZAR:
-
+		results, err = zar.Extract(f)
 	default:
 		return nil, fmt.Errorf("unknown file type for %s", archivePath)
 	}
