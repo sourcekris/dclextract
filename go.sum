@@ -2,9 +2,7 @@ github.com/JoshVarga/blast v0.0.0-20210808061142-eadad17358e8 h1:9bbQDlx6h7MyNk3
 github.com/JoshVarga/blast v0.0.0-20210808061142-eadad17358e8/go.mod h1:rwSKMTLI/8tbw6YDRqtd3Hc0OI3eP/tSTVKshyd8dO8=
 github.com/sourcekris/dclextract/cmz v0.0.0-20250615080000-4fe19d6e7fb0 h1:YYlXlvpHFlg/C/7aUMJNmE45FThmpH1vP4FL53EWx8A=
 github.com/sourcekris/dclextract/cmz v0.0.0-20250615080000-4fe19d6e7fb0/go.mod h1:KMueGFiF1xqCD/WJrPsGxK5FipL3I7Rw6yl1QGMLjq8=
-github.com/sourcekris/dclextract/common v0.0.0-20250615080000-4fe19d6e7fb0 h1:/FEWyezK2jc0PiKhUOpffLkB/jLkJeEViKFf2KcbsHk=
-github.com/sourcekris/dclextract/common v0.0.0-20250615080000-4fe19d6e7fb0/go.mod h1:RYYGAdCC+b2B0kc0YS672kp8RU1qe4I4w4CFIeJiXgI=
-github.com/sourcekris/dclextract/nsk v0.0.0-20250615080000-4fe19d6e7fb0 h1:cLNhaVjgQj+cjMcMTPZcAA2MDr7yLRzFGUuqMnR8+Wk=
-github.com/sourcekris/dclextract/nsk v0.0.0-20250615080000-4fe19d6e7fb0/go.mod h1:eYSfgA0G4jJ1JJCrxDoGA8dNRRjeeDDygJ4H2vwwpGg=
+github.com/sourcekris/dclextract/common v0.0.0-20250622033919-313e2710de76 h1:HH9Zc7ftw3ES6ld7hC/RHjJuM9nPl46dzEEPoWr2OfA=
+github.com/sourcekris/dclextract/common v0.0.0-20250622033919-313e2710de76/go.mod h1:RYYGAdCC+b2B0kc0YS672kp8RU1qe4I4w4CFIeJiXgI=
 github.com/sourcekris/dclextract/nsk v0.0.0-20250615080223-824a240a6538 h1:LMKtgzDLc7zQZrQqLxhE63tzC6w8zGx931XUbhg+Lm8=
 github.com/sourcekris/dclextract/nsk v0.0.0-20250615080223-824a240a6538/go.mod h1:IPFsb4Wbm6hypM3REUzvdkIspDNzw02SQjhp5F0mbcE=

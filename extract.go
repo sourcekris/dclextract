@@ -14,10 +14,6 @@ import (
 	c "github.com/sourcekris/dclextract/common"
 )
 
-func extractTSC(r io.Reader) (data []byte, filename string, compSize uint32, decompSize uint32, err error) {
-	return nil, "", 0, 0, fmt.Errorf("TSC extraction not implemented yet")
-}
-
 func extractZAR(r io.Reader) (data []byte, filename string, compSize uint32, decompSizeRead uint32, err error) {
 	return nil, "", 0, 0, fmt.Errorf("ZAR extraction not implemented yet")
 }

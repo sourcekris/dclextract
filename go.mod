@@ -4,7 +4,7 @@ go 1.21.1
 
 require (
 	github.com/sourcekris/dclextract/cmz v0.0.0-20250615080000-4fe19d6e7fb0
-	github.com/sourcekris/dclextract/common v0.0.0-20250615080000-4fe19d6e7fb0
+	github.com/sourcekris/dclextract/common v0.0.0-20250622033919-313e2710de76
 	github.com/sourcekris/dclextract/nsk v0.0.0-20250615080223-824a240a6538
 )
 
