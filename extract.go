@@ -9,6 +9,7 @@ import (
 
 	"github.com/sourcekris/dclextract/cmz"
 	"github.com/sourcekris/dclextract/nsk"
+	"github.com/sourcekris/dclextract/tsc"
 
 	c "github.com/sourcekris/dclextract/common"
 )
@@ -29,7 +30,6 @@ func extract(archivePath string) ([]c.ExtractedFileData, error) {
 	defer f.Close()
 
 	var results []c.ExtractedFileData
-	// var err error // This 'err' would shadow the one from os.Open if not careful
 
 	header := make([]byte, 12)
 	n, err := f.Read(header)
@@ -45,10 +45,11 @@ func extract(archivePath string) ([]c.ExtractedFileData, error) {
 
 	switch fileType {
 	case c.TypeCMZ:
-		results, err = cmz.Extract(f) // f is *os.File, which is an io.ReadSeeker
+		results, err = cmz.Extract(f)
 	case c.TypeNSK:
-		results, err = nsk.Extract(f) // f is *os.File, which is an io.ReadSeeker
+		results, err = nsk.Extract(f)
 	case c.TypeTSC:
+		results, err = tsc.Extract(f)
 
 	case c.TypeZAR:
 

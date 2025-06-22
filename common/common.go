@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/JoshVarga/blast"
 )
@@ -28,7 +29,7 @@ const (
 var Signatures = map[FileType][]byte{
 	TypeCMZ: []byte{'C', 'l', 'a', 'y'},
 	TypeNSK: []byte{'N', 'S', 'K'},
-	TypeTSC: []byte{0x65, 0x5D, 0x13, 0x8C, 0x08, 0x01},
+	TypeTSC: []byte{0x65, 0x5D, 0x13, 0x8C, 0x08},
 	TypeZAR: []byte{'P', 'T', '&'},
 }
 
@@ -54,6 +55,7 @@ type ExtractedFileData struct {
 	Data             []byte
 	CompressedSize   uint32
 	DecompressedSize uint32
+	Version          string
 }
 
 // DetermineFileType checks the provided data against known signatures.
@@ -116,4 +118,34 @@ func ReadFileMagic(rs io.Reader, expectedMagic []byte) (bytesRead int, err error
 		return n, fmt.Errorf("magic bytes mismatch: expected %x, got %x", expectedMagic, magicBuffer)
 	}
 	return n, nil
+}
+
+// ReadDOSModifiedTimeStamp reads a DOS timestamp from the provided io.Reader
+// and converts it to a time.Time object.
+func ReadDOSModifiedTimeStamp(rs io.Reader) (time.Time, error) {
+	var (
+		db                     [2]byte
+		tb                     [2]byte
+		yr, mo, da, hr, mi, se int
+	)
+	// Read the date and time from the DOS timestamp.
+	if _, err := io.ReadFull(rs, db[:]); err != nil {
+		return time.Time{}, fmt.Errorf("reading DOS modified date: %w", err)
+	}
+	if _, err := io.ReadFull(rs, tb[:]); err != nil {
+		return time.Time{}, fmt.Errorf("reading DOS modified time: %w", err)
+	}
+
+	ddate := uint16(db[0]) | (uint16(db[1]) << 8)
+	dtime := uint16(tb[0]) | (uint16(tb[1]) << 8)
+
+	// Convert the DOS date and time to year, month, day, hour, minute, second.
+	yr = 1980 + int((ddate&0xfe00)>>9)
+	mo = int((ddate & 0x01e0) >> 5)
+	da = int(ddate & 0x001f)
+	hr = int((dtime & 0xf800) >> 11)
+	mi = int((dtime & 0x07e0) >> 5)
+	se = int(2 * (dtime & 0x001f))
+
+	return time.Date(yr, time.Month(mo), da, hr, mi, se, 0, time.UTC), nil
 }
