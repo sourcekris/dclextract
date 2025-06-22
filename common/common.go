@@ -88,6 +88,15 @@ func ReadAndDecompressBlastData(rs io.Reader, compSize, decompSize uint32) ([]by
 	}
 	defer blastReader.Close() // Ensure reader is closed
 
+	// If decompressed size is not known, read everything until the stream ends.
+	if decompSize == 0 {
+		decompressedData, err := io.ReadAll(blastReader)
+		if err != nil {
+			return nil, fmt.Errorf("decompressing data with unknown size: %w", err)
+		}
+		return decompressedData, nil
+	}
+
 	decompressedData := make([]byte, decompSize)
 	if n, err := io.ReadFull(blastReader, decompressedData); err != nil {
 		return nil, fmt.Errorf("decompressing data (read %d of %d bytes): %w", n, decompSize, err)
