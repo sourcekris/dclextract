@@ -79,7 +79,7 @@ func extract(archivePath string) ([]c.ExtractedFileData, error) {
 	return results, nil
 }
 
-func main() { //nolint:funlen // main function can be longer
+func main() {
 	if len(os.Args) != 2 {
 		fmt.Println("Usage: extract <filename>")
 		os.Exit(1)
