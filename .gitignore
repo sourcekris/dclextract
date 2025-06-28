@@ -5,3 +5,5 @@ samples/
 *.nsk
 *.TSC
 *.ZAR
+dclextract.exe
+dclextract

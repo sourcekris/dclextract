@@ -4,6 +4,8 @@ github.com/sourcekris/dclextract/cmz v0.0.0-20250615080000-4fe19d6e7fb0 h1:YYlXl
 github.com/sourcekris/dclextract/cmz v0.0.0-20250615080000-4fe19d6e7fb0/go.mod h1:KMueGFiF1xqCD/WJrPsGxK5FipL3I7Rw6yl1QGMLjq8=
 github.com/sourcekris/dclextract/common v0.0.0-20250622042238-cf6deb8ed1a2 h1:4ULr9llEDlmLDk5sErA91puxmhTGXcVnHL1HhGzi6do=
 github.com/sourcekris/dclextract/common v0.0.0-20250622042238-cf6deb8ed1a2/go.mod h1:RYYGAdCC+b2B0kc0YS672kp8RU1qe4I4w4CFIeJiXgI=
+github.com/sourcekris/dclextract/common v0.0.0-20250628120048-2a1c9fed8a73 h1:j/G6Hwyhyd62CPHx05Uwu9Wk66pJR2kkCNrW//Sx49I=
+github.com/sourcekris/dclextract/common v0.0.0-20250628120048-2a1c9fed8a73/go.mod h1:RYYGAdCC+b2B0kc0YS672kp8RU1qe4I4w4CFIeJiXgI=
 github.com/sourcekris/dclextract/nsk v0.0.0-20250615080223-824a240a6538 h1:LMKtgzDLc7zQZrQqLxhE63tzC6w8zGx931XUbhg+Lm8=
 github.com/sourcekris/dclextract/nsk v0.0.0-20250615080223-824a240a6538/go.mod h1:IPFsb4Wbm6hypM3REUzvdkIspDNzw02SQjhp5F0mbcE=
 github.com/sourcekris/dclextract/tsc v0.0.0-20250622034743-ead442c09503 h1:cXf6ZQMSxMufEe+ObZ08lv//T/BXlXM2OwcxntfHWp8=
